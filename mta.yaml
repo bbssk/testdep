@@ -1,42 +1,92 @@
 _schema-version: 3.3.0
 ID: testdep
+description: A simple CAP project.
 version: 1.0.0
-description: "A simple CAP project."
+modules:
+- name: testdep-srv
+  type: nodejs
+  path: gen/srv
+  requires:
+  - name: testdep-db
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+  parameters:
+    buildpack: nodejs_buildpack
+    instances: 1
+  build-parameters:
+    builder: npm-ci
+- name: testdep-db-deployer
+  type: hdb
+  path: gen/db
+  requires:
+  - name: testdep-db
+  parameters:
+    buildpack: nodejs_buildpack
+- name: testdep-destination-content
+  type: com.sap.application.content
+  requires:
+  - name: testdep-destination-service
+    parameters:
+      content-target: true
+  - name: testdep_html_repo_host
+    parameters:
+      service-key:
+        name: testdep_html_repo_host-key
+  - name: uaa_testdep
+    parameters:
+      service-key:
+        name: uaa_testdep-key
+  parameters:
+    content:
+      instance:
+        destinations:
+        - Name: testdeprouter_testdep_html_repo_host
+          ServiceInstanceName: testdep-html5-app-host-service
+          ServiceKeyName: testdep_html_repo_host-key
+          sap.cloud.service: testdeprouter
+        - Authentication: OAuth2UserTokenExchange
+          Name: testdeprouter_uaa_testdep
+          ServiceInstanceName: testdep-xsuaa-service
+          ServiceKeyName: uaa_testdep-key
+          sap.cloud.service: testdeprouter
+        existing_destinations_policy: ignore
+  build-parameters:
+    no-source: true
+resources:
+- name: testdep-db
+  type: com.sap.xs.hdi-container
+  parameters:
+    service: hana
+    service-plan: hdi-shared
+- name: testdep-destination-service
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      HTML5Runtime_enabled: true
+      version: 1.0.0
+    service: destination
+    service-name: testdep-destination-service
+    service-plan: lite
+- name: testdep_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-name: testdep-html5-app-host-service
+    service-plan: app-host
+- name: uaa_testdep
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: testdep-xsuaa-service
+    service-plan: application
 parameters:
   enable-parallel-deployments: true
 build-parameters:
   before-all:
-    - builder: custom
-      commands:
-        - npm ci
-        - npx cds build --production
-modules:
-  - name: testdep-srv
-    type: nodejs
-    path: gen/srv
-    parameters:
-      instances: 1
-      buildpack: nodejs_buildpack
-    build-parameters:
-      builder: npm-ci
-    provides:
-      - name: srv-api # required by consumers of CAP services (e.g. approuter)
-        properties:
-          srv-url: ${default-url}
-    requires:
-      - name: testdep-db
-
-  - name: testdep-db-deployer
-    type: hdb
-    path: gen/db
-    parameters:
-      buildpack: nodejs_buildpack
-    requires:
-      - name: testdep-db
-
-resources:
-  - name: testdep-db
-    type: com.sap.xs.hdi-container
-    parameters:
-      service: hana
-      service-plan: hdi-shared
+  - builder: custom
+    commands:
+    - npm ci
+    - npx cds build --production
